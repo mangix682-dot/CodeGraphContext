@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1238,7 +1239,7 @@ class GraphWriter:
 
     def delete_repository_from_graph(self, repo_path: str) -> bool:
         repo_path_str = repo_path
-        path_prefix = repo_path_str + "/"
+        path_prefix = repo_path_str + os.sep
         with self.driver.session() as session:
             result = session.run(
                 "MATCH (r:Repository {path: $path}) RETURN count(r) as cnt", path=repo_path_str

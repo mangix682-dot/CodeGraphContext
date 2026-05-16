@@ -208,7 +208,7 @@ def load_config() -> Dict[str, str]:
     # Load global config
     if CONFIG_FILE.exists():
         try:
-            with open(CONFIG_FILE, "r") as f:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
@@ -221,7 +221,7 @@ def load_config() -> Dict[str, str]:
     local_env = find_local_env()
     if local_env and local_env.exists():
         try:
-            with open(local_env, "r") as f:
+            with open(local_env, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
@@ -295,7 +295,7 @@ def save_config(config: Dict[str, str], preserve_db_credentials: bool = True):
     if preserve_db_credentials and CONFIG_FILE.exists():
         # Load existing credentials from file to preserve them
         try:
-            with open(CONFIG_FILE, "r") as f:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
@@ -316,7 +316,7 @@ def save_config(config: Dict[str, str], preserve_db_credentials: bool = True):
                 credentials_to_write[key] = config[key]
     
     try:
-        with open(CONFIG_FILE, "w") as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             f.write("# CodeGraphContext Configuration\n")
             f.write(f"# Location: {CONFIG_FILE}\n\n")
             

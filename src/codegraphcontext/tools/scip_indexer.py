@@ -158,6 +158,8 @@ class ScipIndexer:
                     cwd=str(project_path),
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=300,
                 )
                 if result.returncode == 0 and output_file.exists():
@@ -241,6 +243,8 @@ class ScipIndexer:
                     docker_cmd,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=600,
                 )
                 if result.returncode == 0:
@@ -613,7 +617,8 @@ class ScipIndexParser:
                     }
 
                     if kind in (26, 17):
-                        node.update({"cyclomatic_complexity": 1, "decorators": [], "context": None, "class_context": None})
+                        cls_ctx = self._class_context_from_symbol(sym) if kind == 26 else None
+                        node.update({"cyclomatic_complexity": 1, "decorators": [], "context": None, "class_context": cls_ctx})
                         file_data["functions"].append(node)
                     elif kind == 7:
                         node["bases"] = [self._name_from_symbol(b) for b in defn.get("bases", [])]
@@ -748,15 +753,51 @@ class ScipIndexParser:
                 if name: args.append(name)
         return args, return_type
 
+    def _class_context_from_symbol(self, symbol: str) -> Optional[str]:
+        if "#" not in symbol:
+            return None
+        type_part = symbol.rsplit("#", 1)[0]
+        last_slash = type_part.rfind("/")
+        last_hash = type_part.rfind("#")
+        cut = max(last_slash, last_hash)
+        type_name = type_part[cut + 1:]
+        import re
+        type_name = re.sub(r"\([0-9a-fA-F]{4,}\)\.?$", "", type_name)
+        type_name = re.sub(r"\.\(\$?[^)]*\)", "", type_name)
+        type_name = type_name.strip(".#`")
+        return type_name or None
+
     def _find_enclosing_definition(self, ref_line: int, definition_occurrences: list) -> Optional[str]:
         best_enclosing: Optional[str] = None
         best_enclosing_start = -1
+        has_any_enclosing_range = False
         for occ in definition_occurrences:
             if occ.symbol.endswith("/"): continue
             er = list(getattr(occ, "enclosing_range", []))
             if not er: continue
+            has_any_enclosing_range = True
             enc_start, enc_end = (er[0] + 1, er[2] + 1) if len(er) == 4 else (er[0] + 1, er[0] + 1)
             if enc_start <= ref_line <= enc_end and enc_start > best_enclosing_start:
                 best_enclosing = occ.symbol
                 best_enclosing_start = enc_start
-        return best_enclosing
+        if best_enclosing is not None or has_any_enclosing_range:
+            return best_enclosing
+
+        fallback_sym: Optional[str] = None
+        fallback_start = -1
+        for occ in definition_occurrences:
+            sym = occ.symbol
+            if sym.startswith("local "):
+                continue
+            if sym.endswith("/") or sym.endswith("#"):
+                continue
+            if not sym.rstrip(".").endswith(")"):
+                continue
+            r = list(occ.range)
+            if not r:
+                continue
+            def_line = r[0] + 1
+            if def_line <= ref_line and def_line > fallback_start:
+                fallback_sym = sym
+                fallback_start = def_line
+        return fallback_sym
